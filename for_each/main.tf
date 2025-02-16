@@ -3,3 +3,7 @@ resource "local_file" "animal" {
    for_each = var.filename
    content = "Animals"
 }
+output "hello" {
+  value     = local_file.animal
+  sensitive = true
+}
