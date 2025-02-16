@@ -1,0 +1,5 @@
+Name: Anand
+Gender: male
+Age: 22
+Food: rice
+Favorite Food: true
