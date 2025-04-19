@@ -1,0 +1,60 @@
+- name: Deploy YugabyteDB Multi-Zone Cluster
+  hosts: all
+  become: true
+  tasks:
+
+    - name: Ensure Yugabyte binaries are executable
+      ansible.builtin.file:
+        path: "{{ yugabyte_path }}/bin/{{ item }}"
+        mode: "0755"
+      loop:
+        - yb-master
+        - yb-tserver
+
+    - name: Start YB-Master on Node1
+      ansible.builtin.command: >
+        {{ yugabyte_path }}/bin/yb-master
+        --fs_data_dirs={{ data_dir }}
+        --master_addresses={{ master_ip }}:7100
+        --rpc_bind_addresses={{ master_ip }}:7100
+        --webserver_port=7000
+      async: 60
+      poll: 0
+      when: inventory_hostname == "node1"
+      register: yb_master_output
+
+    - name: Show YB-Master Output
+      ansible.builtin.debug:
+        var: yb_master_output.stdout_lines
+      when: inventory_hostname == "node1"
+
+    - name: Wait for YB-Master to be Ready
+      ansible.builtin.pause:
+        seconds: 10
+      when: inventory_hostname == "node1"
+
+    - name: Start YB-TServer on all Nodes
+      ansible.builtin.command: >
+        {{ yugabyte_path }}/bin/yb-tserver
+        --fs_data_dirs={{ data_dir }}
+        --tserver_master_addrs={{ master_ip }}:7100
+        --rpc_bind_addresses={{ ansible_host }}:9100
+        --webserver_port=9000
+      async: 60
+      poll: 0
+      register: yb_tserver_output
+
+    - name: Show YB-TServer Output
+      ansible.builtin.debug:
+        var: yb_tserver_output.stdout_lines
+
+    - name: Verify Cluster Health
+      ansible.builtin.command: >
+        {{ yugabyte_path }}/bin/yb-admin --master_addresses={{ master_ip }}:7100 list_all_masters
+      when: inventory_hostname == "node1"
+      register: cluster_health
+
+    - name: Show Cluster Health Status
+      ansible.builtin.debug:
+        var: cluster_health.stdout_lines
+      when: inventory_hostname == "node1"
